@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-pdf-images"
+version = "0.1.0"
+description = "Reusable MarkItDown PDF plugin that preserves PDF images in markdown workflows."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["markitdown", "pdf", "markdown", "plugin", "docling"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "docling-core>=2.70.0",
+  "docling-parse>=5.6.0",
+  "markitdown[pdf]>=0.1.5",
+]
+
+[dependency-groups]
+dev = [
+  "pillow>=11.0.0",
+  "pytest>=8.0.0",
+  "reportlab>=4.4.0",
+]
+
+[project.entry-points."markitdown.plugin"]
+pdf_images = "markitdown_pdf_images.plugin"
+
+[project.scripts]
+markitdown-pdf-images = "markitdown_pdf_images.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/markitdown_pdf_images"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
