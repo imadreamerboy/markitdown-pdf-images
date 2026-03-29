@@ -24,6 +24,7 @@ dependencies = [
   "docling-core>=2.70.0",
   "docling-parse>=5.6.0",
   "markitdown[pdf]>=0.1.5",
+  "pypdfium2>=4.30.0",
 ]
 
 [dependency-groups]

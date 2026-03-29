@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+import pypdfium2
 from docling_core.types.doc import DoclingDocument
 from docling_core.types.doc.base import BoundingBox, CoordOrigin, Size
 from docling_core.types.doc.document import ProvenanceItem
@@ -11,6 +12,7 @@ from docling_parse.pdf_parser import DoclingPdfParser, PdfDocument
 
 from .export import PictureRecord, build_conversion_result, extension_from_data_uri
 from .models import ImageMode, PathMode, PdfConversionResult
+from .vector import extract_vector_figures
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,11 @@ def run_pdf_conversion_pipeline(
     prepared = prepare_pdf_source(source)
     pdf_document = DoclingPdfParser().load(io.BytesIO(prepared.source_bytes))
     title = extract_title(pdf_document)
-    document, pictures = build_docling_document(pdf_document, source_name=prepared.source_name)
+    document, pictures = build_docling_document(
+        pdf_document,
+        source_name=prepared.source_name,
+        source_bytes=prepared.source_bytes,
+    )
     return build_conversion_result(
         document,
         title=title,
@@ -92,52 +98,98 @@ def build_docling_document(
     pdf_document: PdfDocument,
     *,
     source_name: str,
+    source_bytes: bytes,
 ) -> tuple[DoclingDocument, list[PictureRecord]]:
     document = DoclingDocument(name=Path(source_name).stem or source_name)
     pictures: list[PictureRecord] = []
+    pdfium_document = pypdfium2.PdfDocument(source_bytes)
 
-    for page_number, page in pdf_document.iterate_pages():
-        page_box = page.dimension.crop_bbox
-        page_width = float(page_box.r - page_box.l)
-        page_height = float(page_box.t - page_box.b)
-        document.add_page(page_no=page_number, size=Size(width=page_width, height=page_height))
+    try:
+        for page_number, page in pdf_document.iterate_pages():
+            page_box = page.dimension.crop_bbox
+            page_width = float(page_box.r - page_box.l)
+            page_height = float(page_box.t - page_box.b)
+            document.add_page(page_no=page_number, size=Size(width=page_width, height=page_height))
 
-        for element in _build_page_elements(page, page_height=page_height):
-            if element.kind == "text" and element.text:
-                document.add_text(
-                    label=DocItemLabel.PARAGRAPH,
-                    text=element.text,
-                    orig=element.text,
-                    prov=_make_provenance(page_number, element.bbox, element.text),
+            pdfium_page = pdfium_document.get_page(page_number - 1)
+            try:
+                vector_figures = extract_vector_figures(
+                    page=page,
+                    page_width=page_width,
+                    page_height=page_height,
+                    pdfium_page=pdfium_page,
                 )
-                continue
+            finally:
+                pdfium_page.close()
 
-            if element.kind == "image" and element.image_ref is not None and element.extension:
-                document.add_picture(
-                    image=element.image_ref,
-                    prov=_make_provenance(page_number, element.bbox, ""),
-                )
-                pictures.append(
-                    PictureRecord(
-                        page_number=page_number,
-                        extension=element.extension,
+            consumed_text_indices = {
+                index
+                for figure in vector_figures
+                for index in figure.consumed_text_indices
+            }
+
+            for element in _build_page_elements(
+                page,
+                page_height=page_height,
+                consumed_text_indices=consumed_text_indices,
+                vector_figures=vector_figures,
+            ):
+                if element.kind == "text" and element.text:
+                    document.add_text(
+                        label=DocItemLabel.PARAGRAPH,
+                        text=element.text,
+                        orig=element.text,
+                        prov=_make_provenance(page_number, element.bbox, element.text),
                     )
-                )
+                    continue
+
+                if element.kind == "image" and element.image_ref is not None and element.extension:
+                    document.add_picture(
+                        image=element.image_ref,
+                        prov=_make_provenance(page_number, element.bbox, ""),
+                    )
+                    pictures.append(
+                        PictureRecord(
+                            page_number=page_number,
+                            extension=element.extension,
+                        )
+                    )
+    finally:
+        pdfium_document.close()
 
     return document, pictures
 
 
-def _build_page_elements(page: object, *, page_height: float) -> list[PageContentElement]:
-    text_elements = _group_text_lines(page.textline_cells, page_height=page_height)
+def _build_page_elements(
+    page: object,
+    *,
+    page_height: float,
+    consumed_text_indices: set[int],
+    vector_figures: list[object],
+) -> list[PageContentElement]:
+    text_elements = _group_text_lines(
+        page.textline_cells,
+        page_height=page_height,
+        consumed_text_indices=consumed_text_indices,
+    )
     image_elements = _build_image_elements(page.bitmap_resources, page_height=page_height)
-    elements = text_elements + image_elements
+    vector_elements = _build_vector_elements(vector_figures, page_height=page_height)
+    elements = text_elements + image_elements + vector_elements
     return sorted(elements, key=lambda element: (element.top, element.left, 0 if element.kind == "text" else 1))
 
 
-def _group_text_lines(lines: list[object], *, page_height: float) -> list[PageContentElement]:
+def _group_text_lines(
+    lines: list[object],
+    *,
+    page_height: float,
+    consumed_text_indices: set[int],
+) -> list[PageContentElement]:
     sorted_lines: list[tuple[BoundingBox, str, float, float]] = []
 
     for line in lines:
+        line_index = int(getattr(line, "index", -1))
+        if line_index in consumed_text_indices:
+            continue
         text = str(getattr(line, "text", "") or "").strip()
         if not text:
             continue
@@ -203,6 +255,22 @@ def _build_image_elements(images: list[object], *, page_height: float) -> list[P
                 kind="image",
                 extension=extension,
                 image_ref=image_ref,
+            )
+        )
+    return elements
+
+
+def _build_vector_elements(vector_figures: list[object], *, page_height: float) -> list[PageContentElement]:
+    elements: list[PageContentElement] = []
+    for figure in vector_figures:
+        elements.append(
+            PageContentElement(
+                top=_top_key(figure.bbox, page_height),
+                left=float(figure.bbox.l),
+                bbox=figure.bbox,
+                kind="image",
+                extension=".png",
+                image_ref=figure.image_ref,
             )
         )
     return elements

@@ -1,14 +1,14 @@
 # markitdown-pdf-images
 
-Small MarkItDown PDF plugin focused on preserving PDF images in markdown workflows without pulling in AGPL PDF dependencies.
+Small MarkItDown PDF plugin focused on preserving PDF images and vector-style figures in markdown workflows without pulling in AGPL PDF dependencies.
 
 ## What this solves
 
-Stock MarkItDown's built-in PDF converter can fall back to plain text extraction, but it does not preserve embedded PDF images as markdown image references. This package registers a higher-priority PDF converter and uses `docling-parse` plus `docling-core` to return markdown with images preserved.
+Stock MarkItDown's built-in PDF converter can fall back to plain text extraction, but it does not preserve embedded PDF images as markdown image references. This package registers a higher-priority PDF converter and uses `docling-parse`, `docling-core`, and `pypdfium2` to return markdown with bitmap images preserved and vector-heavy figures rasterized into reusable assets.
 
 ## Scope
 
-- Preserve PDF images in markdown output
+- Preserve PDF images and vector-like figures in markdown output
 - Expose a small library API with structured asset metadata
 - Work as a MarkItDown plugin through `markitdown.plugin`
 
@@ -33,6 +33,7 @@ This rewrite removes the previous PyMuPDF / MuPDF backend. The runtime stack is 
 - `markitdown[pdf]`
 - `docling-parse`
 - `docling-core`
+- `pypdfium2`
 
 ## MarkItDown plugin usage
 
@@ -110,5 +111,6 @@ This is a fresh rewrite of the earlier PyMuPDF prototype.
 
 - Focused on image preservation, not OCR
 - Uses lightweight page-local ordering, not a full layout engine
+- Vector figures are rasterized into PNG assets when they are not embedded as bitmap images
 - Multi-column and table-heavy PDFs are out of scope for v1
 - Embedded mode returns data URIs, which can make markdown large

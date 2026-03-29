@@ -51,6 +51,32 @@ def make_pdf():
                     mask="auto",
                 )
 
+            for vector in page.get("vectors", []):
+                kind = vector["kind"]
+                if kind == "line":
+                    (x0, y0) = vector["start"]
+                    (x1, y1) = vector["end"]
+                    pdf.line(x0, y0, x1, y1)
+                    continue
+
+                if kind == "rect":
+                    x0, y0, x1, y1 = vector["rect"]
+                    pdf.rect(
+                        x0,
+                        y0,
+                        x1 - x0,
+                        y1 - y0,
+                        stroke=1,
+                        fill=vector.get("fill", 0),
+                    )
+                    continue
+
+                raise ValueError(f"Unsupported vector kind: {kind}")
+
+            for label in page.get("labels", []):
+                x, y = label["pos"]
+                pdf.drawString(x, y, label["text"])
+
             if index < len(pages) - 1:
                 pdf.showPage()
 

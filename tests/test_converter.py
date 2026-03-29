@@ -98,6 +98,36 @@ def test_convert_pdf_multi_page_multiple_images(make_pdf, make_image, tmp_path):
     assert all(asset.path is not None and asset.path.exists() for asset in result.assets)
 
 
+def test_convert_pdf_extracts_vector_figure(make_pdf, tmp_path):
+    pdf_path = make_pdf(
+        tmp_path / "vector-chart.pdf",
+        pages=[
+            {
+                "text": "",
+                "vectors": [
+                    {"kind": "line", "start": (72, 640), "end": (72, 740)},
+                    {"kind": "line", "start": (72, 640), "end": (272, 640)},
+                    {"kind": "rect", "rect": (90, 640, 115, 680), "fill": 1},
+                    {"kind": "rect", "rect": (130, 640, 155, 710), "fill": 1},
+                ],
+                "labels": [
+                    {"text": "A", "pos": (88, 625)},
+                    {"text": "B", "pos": (128, 625)},
+                ],
+            }
+        ],
+    )
+
+    result = convert_pdf(pdf_path, artifacts_dir=tmp_path / "assets")
+
+    assert len(result.assets) == 1
+    assert result.assets[0].path is not None
+    assert result.assets[0].path.exists()
+    assert result.assets[0].filename.endswith(".png")
+    assert result.assets[0].page_number == 1
+    assert "![Image](" in result.markdown
+
+
 def test_convert_pdf_uses_document_scoped_artifacts(make_pdf, make_image, tmp_path):
     shared_artifacts_dir = tmp_path / "shared-assets"
     first_image = make_image(tmp_path / "first" / "image.png", color=(255, 0, 0))
