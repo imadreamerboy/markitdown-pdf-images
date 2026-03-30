@@ -24,12 +24,13 @@ dependencies = [
   "docling-core>=2.70.0",
   "docling-parse>=5.6.0",
   "markitdown[pdf]>=0.1.5",
+  "pillow>=11.0.0",
+  "pytesseract>=0.3.10",
   "pypdfium2>=4.30.0",
 ]
 
 [dependency-groups]
 dev = [
-  "pillow>=11.0.0",
   "pytest>=8.0.0",
   "reportlab>=4.4.0",
 ]

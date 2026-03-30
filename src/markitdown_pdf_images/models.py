@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+AssetKind = Literal["bitmap", "vector"]
 ImageMode = Literal["external", "data-uri"]
 PathMode = Literal["relative", "absolute"]
 
@@ -12,6 +13,8 @@ class PdfAsset:
     path: Path | None
     markdown_path: str
     page_number: int | None
+    kind: AssetKind
+    ocr_text: str | None = None
 
 
 @dataclass(frozen=True)

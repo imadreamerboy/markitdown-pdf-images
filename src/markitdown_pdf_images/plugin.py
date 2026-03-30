@@ -50,11 +50,19 @@ class PdfImagesConverter(DocumentConverter):
         buffer = _NamedBytesIO(file_stream.read(), name=source_name)
         result = convert_pdf(
             buffer,
+            preserve_images=kwargs.get("pdf_preserve_images", False),
             image_mode=kwargs.get("pdf_image_mode", "external"),
             artifacts_dir=kwargs.get("pdf_artifacts_dir"),
             path_mode=kwargs.get("pdf_path_mode", "relative"),
+            ocr_enabled=kwargs.get("pdf_ocr_enabled", False),
+            tesseract_path=kwargs.get("pdf_tesseract_path"),
+            ocr_languages=kwargs.get("pdf_ocr_languages", ""),
+            ocr_engine=kwargs.get("pdf_ocr_engine"),
         )
-        return DocumentConverterResult(markdown=result.markdown, title=result.title)
+        document_result = DocumentConverterResult(markdown=result.markdown, title=result.title)
+        document_result.pdf_conversion_result = result
+        document_result.pdf_assets = result.assets
+        return document_result
 
 
 class _NamedBytesIO(io.BytesIO):

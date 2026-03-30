@@ -52,3 +52,29 @@ def test_plugin_falls_back_to_builtin_when_custom_converter_fails(
     result = markdown.convert(pdf_path)
 
     assert "Built-in fallback text." in result.markdown
+
+
+def test_plugin_attaches_structured_pdf_metadata(make_pdf, make_image, tmp_path):
+    image_path = make_image(tmp_path / "plugin-image.png", color=(255, 0, 0))
+    pdf_path = make_pdf(
+        tmp_path / "plugin.pdf",
+        pages=[
+            {
+                "text": "Plugin metadata sample.",
+                "images": [{"path": image_path, "rect": (72, 640, 180, 720)}],
+            }
+        ],
+    )
+
+    markdown = MarkItDown(enable_plugins=True)
+    result = markdown.convert(
+        pdf_path,
+        pdf_preserve_images=True,
+        pdf_artifacts_dir=tmp_path / "assets",
+    )
+
+    assert hasattr(result, "pdf_conversion_result")
+    assert hasattr(result, "pdf_assets")
+    assert result.pdf_conversion_result.assets == result.pdf_assets
+    assert len(result.pdf_assets) == 1
+    assert result.pdf_assets[0].path is not None

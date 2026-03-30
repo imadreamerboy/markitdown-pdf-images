@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import DoclingDocument
 
-from .models import PathMode, PdfAsset, PdfConversionResult
+from .models import AssetKind, PathMode, PdfAsset, PdfConversionResult
 
 IMAGE_LINK_PATTERN = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<path>[^)]+)\)")
 SAFE_STEM_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
@@ -18,6 +18,8 @@ DATA_URI_PATTERN = re.compile(r"^data:(?P<mime>[-\w.+/]+);")
 class PictureRecord:
     page_number: int
     extension: str
+    kind: AssetKind
+    ocr_text: str | None = None
 
 
 def build_doc_id(source_name: str, source_bytes: bytes) -> str:
@@ -34,10 +36,18 @@ def build_conversion_result(
     source_name: str,
     source_bytes: bytes,
     pictures: list[PictureRecord],
+    preserve_images: bool,
     image_mode: str,
     artifacts_dir: Path | None,
     path_mode: PathMode,
 ) -> PdfConversionResult:
+    if not preserve_images:
+        return PdfConversionResult(
+            markdown=_normalize_markdown(document.export_to_markdown()),
+            title=title,
+            assets=[],
+        )
+
     if image_mode == "external":
         if artifacts_dir is None:
             raise ValueError("artifacts_dir is required for external image mode")
@@ -118,6 +128,8 @@ def _build_assets_from_refs(
                 path=path,
                 markdown_path=ref,
                 page_number=picture.page_number,
+                kind=picture.kind,
+                ocr_text=picture.ocr_text,
             )
         )
     return assets
@@ -136,6 +148,8 @@ def _build_embedded_assets(refs: list[str], pictures: list[PictureRecord]) -> li
                 path=None,
                 markdown_path=ref,
                 page_number=page_number,
+                kind=picture.kind,
+                ocr_text=picture.ocr_text,
             )
         )
     return assets
