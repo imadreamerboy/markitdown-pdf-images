@@ -21,17 +21,17 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "docling-core>=2.70.0",
+  "docling-core>=2.74.1",
   "docling-parse>=5.6.0",
   "markitdown[pdf]>=0.1.5",
-  "pillow>=11.0.0",
+  "pillow>=12.2.0",
   "pytesseract>=0.3.10",
   "pypdfium2>=4.30.0",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest>=8.0.0",
+  "pytest>=9.0.3",
   "reportlab>=4.4.0",
 ]
 
